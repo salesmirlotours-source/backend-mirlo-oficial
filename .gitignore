@@ -1,0 +1,46 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+.venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment variables (NO subir a git!)
+.env
+.env.local
+.env.dev
+.env.prod
+
+# Uploads locales (en produccion usar S3 o similar)
+uploads/
+
+# Logs
+*.log
+
+# Database dumps
+*.sql
+dump-railway-*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Build
+dist/
+build/
+*.egg-info/
