@@ -21,11 +21,11 @@ def create_app():
     # Crear carpeta de uploads si no existe
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
-    # ⭐ CONFIGURACIÓN DE CORREO (Flask-Mail)
+    # ⭐ CONFIGURACIÓN DE CORREO (Flask-Mail) - Puerto 465 SSL para Railway
     app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-    app.config['MAIL_PORT'] = 587
-    app.config['MAIL_USE_TLS'] = True
-    app.config['MAIL_USE_SSL'] = False
+    app.config['MAIL_PORT'] = 465
+    app.config['MAIL_USE_TLS'] = False
+    app.config['MAIL_USE_SSL'] = True
     app.config['MAIL_USERNAME'] = os.environ.get('GMAIL_SMTP_USER', 'Salesmirlotours@gmail.com')
     app.config['MAIL_PASSWORD'] = os.environ.get('GMAIL_SMTP_APP_PASSWORD', 'xjzq ybas kmfd nzvu')
     app.config['MAIL_DEFAULT_SENDER'] = ('Mirlo Tours', os.environ.get('GMAIL_SMTP_USER', 'Salesmirlotours@gmail.com'))
