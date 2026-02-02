@@ -1,12 +1,11 @@
 # =====================================================
-# AGREGAR A tour_routes.py o crear consulta_routes.py
+# RUTAS DE CONSULTAS
 # =====================================================
 
 from flask import Blueprint, request, jsonify, current_app
-from flask_mail import Message
-from extensions import db, mail
 from models import Tour
 from datetime import datetime
+from email_service import enviar_email, ADMIN_EMAIL
 
 consulta_bp = Blueprint("consulta", __name__, url_prefix="/tours")
 
@@ -45,12 +44,9 @@ def crear_consulta(slug):
 
     try:
         # ========== 1. CORREO AL ADMIN ==========
-        admin_email = current_app.config.get('ADMIN_EMAIL', 'Salesmirlotours@gmail.com')
-        
-        msg_admin = Message(
-            subject=f"📩 Nueva Consulta - {tour_nombre}",
-            recipients=[admin_email],
-            html=f"""
+        admin_email = ADMIN_EMAIL
+
+        html_admin = f"""
             <!DOCTYPE html>
             <html>
             <head>
@@ -128,15 +124,10 @@ def crear_consulta(slug):
             </body>
             </html>
             """
-        )
-        mail.send(msg_admin)
-        print(f"📧 Correo admin enviado a: {admin_email}")
+        enviar_email([admin_email], f"📩 Nueva Consulta - {tour_nombre}", html_admin)
 
         # ========== 2. CORREO AL CLIENTE (Confirmación) ==========
-        msg_cliente = Message(
-            subject=f"Recibimos tu consulta - Mirlo Tours 🦅",
-            recipients=[email],
-            html=f"""
+        html_cliente = f"""
             <!DOCTYPE html>
             <html>
             <head>
@@ -204,9 +195,7 @@ def crear_consulta(slug):
             </body>
             </html>
             """
-        )
-        mail.send(msg_cliente)
-        print(f"📧 Correo cliente enviado a: {email}")
+        enviar_email([email], f"Recibimos tu consulta - Mirlo Tours", html_cliente)
 
         return jsonify({
             "message": "Consulta enviada exitosamente",

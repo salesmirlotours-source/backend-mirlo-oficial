@@ -2,9 +2,9 @@
 from datetime import datetime
 from flask import Blueprint, jsonify, request, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from flask_mail import Message
 
-from extensions import db, mail
+from extensions import db
+from email_service import enviar_email, ADMIN_EMAIL
 from models import (
     Tour,
     Comentario,
@@ -469,20 +469,17 @@ def enviar_correo_cliente(reserva, usuario, tour, fecha, email_destino, nombre_c
     </html>
     """
     
-    msg = Message(
-        subject=f"✈️ Solicitud de Reserva #{reserva.id} - {tour.nombre}",
-        recipients=[email_destino],
-        html=html_content
+    enviar_email(
+        [email_destino],
+        f"✈️ Solicitud de Reserva #{reserva.id} - {tour.nombre}",
+        html_content
     )
-    
-    mail.send(msg)
-    print(f"📧 Correo enviado a: {email_destino}")
 
 
 def enviar_correo_admin(reserva, usuario, tour, fecha, telefono_contacto):
     """Envía notificación al admin sobre nueva pre-reserva"""
-    
-    admin_email = current_app.config.get('ADMIN_EMAIL', 'Salesmirlotours@gmail.com')
+
+    admin_email = ADMIN_EMAIL
     
     fecha_inicio_str = fecha.fecha_inicio.strftime('%d/%m/%Y') if fecha.fecha_inicio else 'Por confirmar'
     fecha_fin_str = fecha.fecha_fin.strftime('%d/%m/%Y') if fecha.fecha_fin else 'Por confirmar'
@@ -582,14 +579,11 @@ def enviar_correo_admin(reserva, usuario, tour, fecha, telefono_contacto):
     </html>
     """
     
-    msg = Message(
-        subject=f"🔔 Nueva Pre-Reserva #{reserva.id} - {tour.nombre} - {usuario.nombre}",
-        recipients=[admin_email],
-        html=html_content
+    enviar_email(
+        [admin_email],
+        f"🔔 Nueva Pre-Reserva #{reserva.id} - {tour.nombre} - {usuario.nombre}",
+        html_content
     )
-    
-    mail.send(msg)
-    print(f"📧 Correo admin enviado a: {admin_email}")
 
     # ================== GUÍAS PÚBLICOS =====================
 

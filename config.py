@@ -11,7 +11,7 @@ class Config:
     # URL de tu PostgreSQL en Railway
     _db_url = os.getenv(
         "DATABASE_URL",
-        "postgresql://postgres:SEniCbiQObIIcHRTNxMBxvdFwkmkkfhY@turntable.proxy.rlwy.net:59803/railway"
+        "postgresql://postgres:cDBhnPzSgNrpKgVVheQHEsAJnOyKWHMk@turntable.proxy.rlwy.net:18046/railway"
     )
     # Agregar sslmode si no está presente
     if "sslmode" not in _db_url:
