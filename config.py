@@ -9,10 +9,14 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 class Config:
     # URL de tu PostgreSQL en Railway
-    SQLALCHEMY_DATABASE_URI = os.getenv(
+    _db_url = os.getenv(
         "DATABASE_URL",
         "postgresql://postgres:SEniCbiQObIIcHRTNxMBxvdFwkmkkfhY@turntable.proxy.rlwy.net:59803/railway"
     )
+    # Agregar sslmode si no está presente
+    if "sslmode" not in _db_url:
+        _db_url = _db_url + "?sslmode=require"
+    SQLALCHEMY_DATABASE_URI = _db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # JWT
@@ -21,8 +25,11 @@ class Config:
     # Para que SQLAlchemy apunte por defecto al schema travel
     SQLALCHEMY_ENGINE_OPTIONS = {
         "connect_args": {
-            "options": "-csearch_path=travel"
-        }
+            "options": "-csearch_path=travel",
+            "sslmode": "require"
+        },
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
     }
 
     # CORS
