@@ -22,7 +22,7 @@ env/
 .env.prod
 
 # Uploads locales (en produccion usar S3 o similar)
-uploads/
+
 
 # Logs
 *.log
