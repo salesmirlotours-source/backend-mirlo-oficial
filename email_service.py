@@ -5,8 +5,8 @@ import resend
 # Configurar API key de Resend
 resend.api_key = os.environ.get('RESEND_API_KEY', '')
 
-# Email por defecto para enviar (debe ser verificado en Resend o usar onboarding@resend.dev)
-DEFAULT_FROM_EMAIL = os.environ.get('RESEND_FROM_EMAIL', 'onboarding@resend.dev')
+# Email por defecto para enviar (debe ser verificado en Resend)
+DEFAULT_FROM_EMAIL = os.environ.get('RESEND_FROM_EMAIL', 'Mirlo Tours <noreply@mirlotoursec.com>')
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'Salesmirlotours@gmail.com')
 
 
