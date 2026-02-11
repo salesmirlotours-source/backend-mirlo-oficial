@@ -1,5 +1,6 @@
 # config.py
 import os
+from datetime import timedelta
 from dotenv import load_dotenv
 
 load_dotenv()  # carga .env si existe
@@ -21,6 +22,7 @@ class Config:
 
     # JWT
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "super-secret-key")
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=24)
 
     # Para que SQLAlchemy apunte por defecto al schema travel
     SQLALCHEMY_ENGINE_OPTIONS = {

@@ -26,7 +26,8 @@ from models import (
     ComentarioEstado,
     TourBanner, MediaTipo,
     TourUbicacion,
-    Categoria
+    Categoria,
+    ConsultaTour
 )
 from sqlalchemy import func # <--- AGREGA ESTO AL INICIO DE admin_routes.py
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -2568,4 +2569,95 @@ def admin_update_galeria(item_id):
         "message": "Galeria actualizada",
         "galeria": item.to_dict()
     })
+
+
+# ================== ELIMINACIÓN PERMANENTE =====================
+
+@admin_bp.delete("/reservas/<int:reserva_id>/permanente")
+@jwt_required()
+def admin_delete_reserva_permanente(reserva_id):
+    """
+    Elimina una reserva PERMANENTEMENTE de la base de datos.
+    CUIDADO: Esta acción no se puede deshacer.
+    """
+    _, error = _require_admin()
+    if error:
+        return error
+
+    reserva = Reserva.query.get(reserva_id)
+    if not reserva:
+        return jsonify({"message": "Reserva no encontrada"}), 404
+
+    try:
+        info = {
+            "id": reserva.id,
+            "tour": reserva.tour.nombre if reserva.tour else "N/A",
+            "usuario": reserva.usuario.email if reserva.usuario else "N/A"
+        }
+
+        db.session.delete(reserva)
+        db.session.commit()
+
+        return jsonify({
+            "message": f"Reserva #{info['id']} eliminada permanentemente",
+            "deleted": info
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "message": f"Error al eliminar reserva: {str(e)}"
+        }), 500
+
+
+@admin_bp.delete("/usuarios/<int:usuario_id>/permanente")
+@jwt_required()
+def admin_delete_usuario_permanente(usuario_id):
+    """
+    Elimina un usuario PERMANENTEMENTE de la base de datos.
+    CUIDADO: Esta acción no se puede deshacer.
+    Elimina: reservas, comentarios y consultas del usuario.
+    """
+    admin, error = _require_admin()
+    if error:
+        return error
+
+    usuario = Usuario.query.get(usuario_id)
+    if not usuario:
+        return jsonify({"message": "Usuario no encontrado"}), 404
+
+    # No permitir eliminarse a sí mismo
+    if usuario.id == admin.id:
+        return jsonify({"message": "No puedes eliminar tu propia cuenta"}), 400
+
+    # Solo super_admin puede eliminar otros super_admins
+    if usuario.rol == "super_admin" and admin.rol != "super_admin":
+        return jsonify({"message": "Solo un super_admin puede eliminar otros super_admins"}), 403
+
+    try:
+        nombre_usuario = f"{usuario.nombre} ({usuario.email})"
+
+        # 1. Eliminar reservas del usuario
+        Reserva.query.filter_by(usuario_id=usuario_id).delete()
+
+        # 2. Eliminar comentarios del usuario
+        Comentario.query.filter_by(usuario_id=usuario_id).delete()
+
+        # 3. Eliminar consultas del usuario
+        ConsultaTour.query.filter_by(usuario_id=usuario_id).delete()
+
+        # 4. Eliminar el usuario
+        db.session.delete(usuario)
+        db.session.commit()
+
+        return jsonify({
+            "message": f"Usuario '{nombre_usuario}' eliminado permanentemente",
+            "deleted_id": usuario_id
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "message": f"Error al eliminar usuario: {str(e)}"
+        }), 500
 
