@@ -756,6 +756,34 @@ class TourBanner(db.Model):
         }
 
 
+class PortadaHome(db.Model):
+    """Fotos de portada/hero para el Home."""
+    __tablename__ = "portadas_home"
+    __table_args__ = {"schema": "travel"}
+
+    id = db.Column(db.BigInteger, primary_key=True)
+    titulo = db.Column(db.String(255))
+    subtitulo = db.Column(db.Text)
+    imagen_url = db.Column(db.Text, nullable=False)
+    enlace = db.Column(db.Text)
+    orden = db.Column(db.Integer, default=0)
+    activo = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "titulo": self.titulo,
+            "subtitulo": self.subtitulo,
+            "imagen_url": self.imagen_url,
+            "enlace": self.enlace,
+            "orden": self.orden,
+            "activo": self.activo,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
 
 
 

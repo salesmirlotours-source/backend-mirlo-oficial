@@ -17,10 +17,21 @@ from models import (
     PagoEstado,
     Guia,
     TourUbicacion,
-    Categoria
+    Categoria,
+    PortadaHome
 )
 
 tour_bp = Blueprint("tours", __name__, url_prefix="/tours")
+
+
+# ================== PORTADAS HOME (PÚBLICO) =====================
+
+@tour_bp.get("/portadas-home")
+def list_portadas_home():
+    """Lista las portadas activas del home (público, sin auth)."""
+    portadas = PortadaHome.query.filter_by(activo=True)\
+        .order_by(PortadaHome.orden.asc()).all()
+    return jsonify([p.to_dict() for p in portadas])
 
 
 # ================== CATEGORÍAS (PÚBLICO) =====================

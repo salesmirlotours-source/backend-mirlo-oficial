@@ -27,7 +27,8 @@ from models import (
     TourBanner, MediaTipo,
     TourUbicacion,
     Categoria,
-    ConsultaTour
+    ConsultaTour,
+    PortadaHome
 )
 from sqlalchemy import func # <--- AGREGA ESTO AL INICIO DE admin_routes.py
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -611,9 +612,15 @@ def admin_delete_fecha(fecha_id):
     if not fecha:
         return jsonify({"message": "Fecha no encontrada"}), 404
 
-    db.session.delete(fecha)
-    db.session.commit()
-    return jsonify({"message": "Fecha eliminada"})
+    try:
+        # Eliminar reservas asociadas a esta fecha antes de borrarla
+        Reserva.query.filter_by(fecha_tour_id=fecha_id).delete()
+        db.session.delete(fecha)
+        db.session.commit()
+        return jsonify({"message": "Fecha eliminada"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"message": f"Error al eliminar fecha: {str(e)}"}), 500
 
 
 # ================== ITINERARIO =====================
@@ -2648,4 +2655,142 @@ def admin_delete_usuario_permanente(usuario_id):
         return jsonify({
             "message": f"Error al eliminar usuario: {str(e)}"
         }), 500
+
+
+# ================== PORTADAS HOME =====================
+
+@admin_bp.get("/portadas-home")
+@jwt_required()
+def admin_list_portadas_home():
+    """Lista todas las portadas del home."""
+    _, error = _require_admin()
+    if error:
+        return error
+
+    portadas = PortadaHome.query.order_by(PortadaHome.orden.asc()).all()
+    return jsonify([p.to_dict() for p in portadas])
+
+
+@admin_bp.post("/portadas-home")
+@jwt_required()
+def admin_create_portada_home():
+    """
+    Crea una portada para el home.
+    Soporta multipart/form-data con campo 'file'.
+    Campos opcionales en form: titulo, subtitulo, enlace, orden, activo.
+    """
+    _, error = _require_admin()
+    if error:
+        return error
+
+    imagen_url = None
+
+    if "file" in request.files:
+        file = request.files["file"]
+        if file.filename == "":
+            return jsonify({"message": "Nombre de archivo vacío"}), 400
+        if not allowed_file(file.filename):
+            return jsonify({"message": "Tipo de archivo no permitido"}), 400
+
+        filename = secure_filename(file.filename)
+        folder = "home"
+        upload_folder = os.path.join(current_app.config["UPLOAD_FOLDER"], folder)
+        os.makedirs(upload_folder, exist_ok=True)
+
+        filepath = os.path.join(upload_folder, filename)
+        file.save(filepath)
+        imagen_url = f"/uploads/{folder}/{filename}"
+        data = request.form
+    else:
+        data = request.get_json() or {}
+        imagen_url = data.get("imagen_url")
+
+    if not imagen_url:
+        return jsonify({"message": "Debe proporcionar un archivo o imagen_url"}), 400
+
+    portada = PortadaHome(
+        titulo=data.get("titulo"),
+        subtitulo=data.get("subtitulo"),
+        imagen_url=imagen_url,
+        enlace=data.get("enlace"),
+        orden=int(data.get("orden", 0)),
+        activo=True,
+    )
+
+    db.session.add(portada)
+    db.session.commit()
+
+    return jsonify({
+        "message": "Portada creada",
+        "portada": portada.to_dict()
+    }), 201
+
+
+@admin_bp.put("/portadas-home/<int:portada_id>")
+@jwt_required()
+def admin_update_portada_home(portada_id):
+    """
+    Actualiza una portada del home.
+    Soporta multipart/form-data (con nuevo 'file') o JSON.
+    """
+    _, error = _require_admin()
+    if error:
+        return error
+
+    portada = PortadaHome.query.get(portada_id)
+    if not portada:
+        return jsonify({"message": "Portada no encontrada"}), 404
+
+    if "file" in request.files:
+        file = request.files["file"]
+        if file.filename and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            folder = "home"
+            upload_folder = os.path.join(current_app.config["UPLOAD_FOLDER"], folder)
+            os.makedirs(upload_folder, exist_ok=True)
+            filepath = os.path.join(upload_folder, filename)
+            file.save(filepath)
+            portada.imagen_url = f"/uploads/{folder}/{filename}"
+        data = request.form
+    else:
+        data = request.get_json() or {}
+        if "imagen_url" in data:
+            portada.imagen_url = data["imagen_url"]
+
+    if "titulo" in data:
+        portada.titulo = data["titulo"]
+    if "subtitulo" in data:
+        portada.subtitulo = data["subtitulo"]
+    if "enlace" in data:
+        portada.enlace = data["enlace"]
+    if "orden" in data:
+        portada.orden = int(data["orden"])
+    if "activo" in data:
+        val = data["activo"]
+        portada.activo = val if isinstance(val, bool) else str(val).lower() in ("true", "1")
+
+    db.session.commit()
+
+    return jsonify({
+        "message": "Portada actualizada",
+        "portada": portada.to_dict()
+    })
+
+
+@admin_bp.delete("/portadas-home/<int:portada_id>")
+@jwt_required()
+def admin_delete_portada_home(portada_id):
+    """Elimina una portada del home permanentemente."""
+    _, error = _require_admin()
+    if error:
+        return error
+
+    portada = PortadaHome.query.get(portada_id)
+    if not portada:
+        return jsonify({"message": "Portada no encontrada"}), 404
+
+    db.session.delete(portada)
+    db.session.commit()
+
+    return jsonify({"message": "Portada eliminada"})
 
