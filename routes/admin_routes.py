@@ -1850,18 +1850,14 @@ def admin_update_usuario(usuario_id):
         if campo in data:
             setattr(usuario, campo, data[campo])
 
-    # Cambio de rol (solo super_admin puede cambiar roles)
+    # Cambio de rol (admin y super_admin pueden cambiar roles)
     if "rol" in data:
         nuevo_rol = data["rol"].lower()
         roles_validos = ["cliente", "admin", "super_admin"]
-        
+
         if nuevo_rol not in roles_validos:
             return jsonify({"message": f"Rol inválido. Debe ser: {', '.join(roles_validos)}"}), 400
-        
-        # Solo super_admin puede crear otros admins
-        if nuevo_rol in ["admin", "super_admin"] and admin.rol != "super_admin":
-            return jsonify({"message": "Solo un super_admin puede asignar roles de administrador"}), 403
-        
+
         # No permitir degradarse a sí mismo
         if usuario.id == admin.id and nuevo_rol == "cliente":
             return jsonify({"message": "No puedes degradar tu propio rol"}), 400
@@ -1922,10 +1918,6 @@ def admin_cambiar_rol_usuario(usuario_id):
     if error:
         return error
 
-    # Solo super_admin puede cambiar roles
-    if admin.rol != "super_admin":
-        return jsonify({"message": "Solo un super_admin puede cambiar roles"}), 403
-
     usuario = Usuario.query.get(usuario_id)
     if not usuario:
         return jsonify({"message": "Usuario no encontrado"}), 404
@@ -1982,10 +1974,6 @@ def admin_crear_usuario():
     
     if rol not in roles_validos:
         return jsonify({"message": f"Rol inválido. Opciones: {', '.join(roles_validos)}"}), 400
-
-    # Solo super_admin puede crear admins
-    if rol in ["admin", "super_admin"] and admin.rol != "super_admin":
-        return jsonify({"message": "Solo un super_admin puede crear administradores"}), 403
 
     usuario = Usuario(
         nombre=data["nombre"],
