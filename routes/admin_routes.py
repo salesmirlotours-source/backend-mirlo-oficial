@@ -369,11 +369,11 @@ def admin_update_tour(tour_id):
     for field in [
         "nombre", "slug", "pais", "duracion_dias", "nivel_actividad",
         "precio_pp", "moneda", "banner_url",
-        "foto_portada",
+        "foto_portada", "posicion_portada",
         "descripcion_corta",
         "descripcion_larga", "ruta_resumida", "guia_principal_id",
         "activo", "orden_destacado",
-        "categoria_id"  # Para asignar categoría
+        "categoria_id"
     ]:
         if field in data:
             setattr(tour, field, data[field])
@@ -428,11 +428,16 @@ def admin_upload_portada(tour_id):
     # Actualizar el tour con la URL de la portada
     foto_url = f"/uploads/{folder}/{filename}".replace("//", "/")
     tour.foto_portada = foto_url
+    # Leer posicion_portada del form-data si viene
+    posicion = request.form.get("posicion_portada")
+    if posicion:
+        tour.posicion_portada = posicion
     db.session.commit()
 
     return jsonify({
         "message": "Foto de portada actualizada",
         "foto_portada": foto_url,
+        "posicion_portada": tour.posicion_portada,
         "tour": tour.to_card_dict()
     }), 200
 
@@ -2557,6 +2562,8 @@ def admin_update_galeria(item_id):
         item.orden = data["orden"]
     if "categoria" in data:
         item.categoria = data["categoria"]
+    if "posicion_imagen" in data:
+        item.posicion_imagen = data["posicion_imagen"]
 
     db.session.commit()
 
@@ -2657,27 +2664,37 @@ def admin_delete_usuario_permanente(usuario_id):
         }), 500
 
 
-# ================== PORTADAS HOME =====================
+# ================== PORTADAS (HOME, SOBRE NOSOTROS, CONTACTANOS) =====================
 
-@admin_bp.get("/portadas-home")
+SECCIONES_VALIDAS = ["home", "sobre_nosotros", "contactanos"]
+
+
+@admin_bp.get("/portadas")
 @jwt_required()
-def admin_list_portadas_home():
-    """Lista todas las portadas del home."""
+def admin_list_portadas():
+    """
+    Lista portadas. Filtrar por seccion con ?seccion=home
+    Sin filtro devuelve todas.
+    """
     _, error = _require_admin()
     if error:
         return error
 
-    portadas = PortadaHome.query.order_by(PortadaHome.orden.asc()).all()
+    seccion = request.args.get("seccion")
+    query = PortadaHome.query
+    if seccion:
+        query = query.filter_by(seccion=seccion)
+    portadas = query.order_by(PortadaHome.orden.asc()).all()
     return jsonify([p.to_dict() for p in portadas])
 
 
-@admin_bp.post("/portadas-home")
+@admin_bp.post("/portadas")
 @jwt_required()
-def admin_create_portada_home():
+def admin_create_portada():
     """
-    Crea una portada para el home.
+    Crea una portada para cualquier sección.
     Soporta multipart/form-data con campo 'file'.
-    Campos opcionales en form: titulo, subtitulo, enlace, orden, activo.
+    Campo obligatorio: seccion (home, sobre_nosotros, contactanos).
     """
     _, error = _require_admin()
     if error:
@@ -2692,27 +2709,36 @@ def admin_create_portada_home():
         if not allowed_file(file.filename):
             return jsonify({"message": "Tipo de archivo no permitido"}), 400
 
+        data = request.form
+        seccion = data.get("seccion", "home").lower()
+        if seccion not in SECCIONES_VALIDAS:
+            return jsonify({"message": f"Sección inválida. Opciones: {', '.join(SECCIONES_VALIDAS)}"}), 400
+
         filename = secure_filename(file.filename)
-        folder = "home"
+        folder = f"portadas/{seccion}"
         upload_folder = os.path.join(current_app.config["UPLOAD_FOLDER"], folder)
         os.makedirs(upload_folder, exist_ok=True)
 
         filepath = os.path.join(upload_folder, filename)
         file.save(filepath)
         imagen_url = f"/uploads/{folder}/{filename}"
-        data = request.form
     else:
         data = request.get_json() or {}
         imagen_url = data.get("imagen_url")
+        seccion = data.get("seccion", "home").lower()
+        if seccion not in SECCIONES_VALIDAS:
+            return jsonify({"message": f"Sección inválida. Opciones: {', '.join(SECCIONES_VALIDAS)}"}), 400
 
     if not imagen_url:
         return jsonify({"message": "Debe proporcionar un archivo o imagen_url"}), 400
 
     portada = PortadaHome(
+        seccion=seccion,
         titulo=data.get("titulo"),
         subtitulo=data.get("subtitulo"),
         imagen_url=imagen_url,
         enlace=data.get("enlace"),
+        posicion_imagen=data.get("posicion_imagen", "50% 50%"),
         orden=int(data.get("orden", 0)),
         activo=True,
     )
@@ -2726,11 +2752,11 @@ def admin_create_portada_home():
     }), 201
 
 
-@admin_bp.put("/portadas-home/<int:portada_id>")
+@admin_bp.put("/portadas/<int:portada_id>")
 @jwt_required()
-def admin_update_portada_home(portada_id):
+def admin_update_portada(portada_id):
     """
-    Actualiza una portada del home.
+    Actualiza una portada.
     Soporta multipart/form-data (con nuevo 'file') o JSON.
     """
     _, error = _require_admin()
@@ -2745,7 +2771,7 @@ def admin_update_portada_home(portada_id):
         file = request.files["file"]
         if file.filename and allowed_file(file.filename):
             filename = secure_filename(file.filename)
-            folder = "home"
+            folder = f"portadas/{portada.seccion}"
             upload_folder = os.path.join(current_app.config["UPLOAD_FOLDER"], folder)
             os.makedirs(upload_folder, exist_ok=True)
             filepath = os.path.join(upload_folder, filename)
@@ -2763,6 +2789,8 @@ def admin_update_portada_home(portada_id):
         portada.subtitulo = data["subtitulo"]
     if "enlace" in data:
         portada.enlace = data["enlace"]
+    if "posicion_imagen" in data:
+        portada.posicion_imagen = data["posicion_imagen"]
     if "orden" in data:
         portada.orden = int(data["orden"])
     if "activo" in data:
@@ -2777,10 +2805,10 @@ def admin_update_portada_home(portada_id):
     })
 
 
-@admin_bp.delete("/portadas-home/<int:portada_id>")
+@admin_bp.delete("/portadas/<int:portada_id>")
 @jwt_required()
-def admin_delete_portada_home(portada_id):
-    """Elimina una portada del home permanentemente."""
+def admin_delete_portada(portada_id):
+    """Elimina una portada permanentemente."""
     _, error = _require_admin()
     if error:
         return error

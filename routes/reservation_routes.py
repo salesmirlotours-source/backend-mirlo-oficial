@@ -521,7 +521,7 @@ def enviar_correo_admin(reserva, usuario, tour, fecha):
                 {"<div class='section'><div class='section-title'>💬 Comentarios del Cliente</div><p style='background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 0;'>" + str(reserva.comentarios_cliente) + "</p></div>" if reserva.comentarios_cliente else ""}
                 
                 <div style="text-align: center; margin-top: 25px;">
-                    <a href="http://localhost:3000/admin/reservas/{reserva.id}" class="btn">
+                    <a href="https://www.mirlotoursec.com/admin/reservas/{reserva.id}" class="btn">
                         👁️ Ver en Panel de Admin
                     </a>
                 </div>

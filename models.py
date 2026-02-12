@@ -209,7 +209,8 @@ class Tour(db.Model):
     ruta_resumida = db.Column(db.Text)
     guia_principal_id = db.Column(db.BigInteger, db.ForeignKey("travel.guias.id"))
     guia_principal = relationship("Guia", foreign_keys=[guia_principal_id])
-    foto_portada = db.Column(db.Text)  # ⭐ AGREGAR ESTA LÍNEA
+    foto_portada = db.Column(db.Text)
+    posicion_portada = db.Column(db.String(50), default="50% 50%")
     activo = db.Column(db.Boolean, nullable=False, default=True)
     orden_destacado = db.Column(db.Integer)
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
@@ -240,6 +241,7 @@ class Tour(db.Model):
             "moneda": self.moneda,
             "banner_url": self.banner_url,
             "foto_portada": self.foto_portada,
+            "posicion_portada": self.posicion_portada or "50% 50%",
             "categoria": {
                 "id": self.categoria.id,
                 "nombre": self.categoria.nombre,
@@ -395,6 +397,7 @@ class Galeria(db.Model):
     categoria = db.Column(db.String(100))
     foto_url = db.Column(db.Text, nullable=False)
     descripcion = db.Column(db.Text)
+    posicion_imagen = db.Column(db.String(50), default="50% 50%")
     orden = db.Column(db.Integer)
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
     updated_at = db.Column(
@@ -409,6 +412,7 @@ class Galeria(db.Model):
             "categoria": self.categoria,
             "foto_url": self.foto_url,
             "descripcion": self.descripcion,
+            "posicion_imagen": self.posicion_imagen or "50% 50%",
             "orden": self.orden,
         }
 
@@ -757,15 +761,17 @@ class TourBanner(db.Model):
 
 
 class PortadaHome(db.Model):
-    """Fotos de portada/hero para el Home."""
+    """Fotos de portada/hero para páginas: home, sobre_nosotros, contactanos."""
     __tablename__ = "portadas_home"
     __table_args__ = {"schema": "travel"}
 
     id = db.Column(db.BigInteger, primary_key=True)
+    seccion = db.Column(db.String(50), nullable=False, default="home")
     titulo = db.Column(db.String(255))
     subtitulo = db.Column(db.Text)
     imagen_url = db.Column(db.Text, nullable=False)
     enlace = db.Column(db.Text)
+    posicion_imagen = db.Column(db.String(50), default="50% 50%")
     orden = db.Column(db.Integer, default=0)
     activo = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
@@ -774,10 +780,12 @@ class PortadaHome(db.Model):
     def to_dict(self):
         return {
             "id": self.id,
+            "seccion": self.seccion,
             "titulo": self.titulo,
             "subtitulo": self.subtitulo,
             "imagen_url": self.imagen_url,
             "enlace": self.enlace,
+            "posicion_imagen": self.posicion_imagen or "50% 50%",
             "orden": self.orden,
             "activo": self.activo,
             "created_at": self.created_at.isoformat() if self.created_at else None,
