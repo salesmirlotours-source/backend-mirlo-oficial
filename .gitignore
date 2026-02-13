@@ -21,9 +21,9 @@ env/
 .env.dev
 .env.prod
 
-# Uploads locales
-uploads/
-static/uploads/
+# Uploads locales (se suben a git para que Railway las tenga)
+# uploads/
+# static/uploads/
 
 
 # Logs

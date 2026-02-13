@@ -179,6 +179,9 @@ class Guia(db.Model):
     idiomas = db.Column(db.String(255))
     pais_base = db.Column(db.String(100))
     redes_sociales = db.Column(db.Text)
+    whatsapp = db.Column(db.String(50))
+    instagram = db.Column(db.String(150))
+    tiktok = db.Column(db.String(150))
     activo = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
     updated_at = db.Column(

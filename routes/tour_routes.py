@@ -618,6 +618,9 @@ def public_list_guias():
             "bio": g.bio,
             "idiomas": g.idiomas,
             "pais_base": g.pais_base,
+            "whatsapp": g.whatsapp,
+            "instagram": g.instagram,
+            "tiktok": g.tiktok,
         }
         for g in guias
     ])

@@ -946,6 +946,9 @@ def admin_list_guias():
             "especialidad": g.especialidad,
             "idiomas": g.idiomas,
             "pais_base": g.pais_base,
+            "whatsapp": g.whatsapp,
+            "instagram": g.instagram,
+            "tiktok": g.tiktok,
             "activo": g.activo,
         }
         for g in guias
@@ -1012,6 +1015,9 @@ def admin_create_guia():
         idiomas=data.get("idiomas"),
         pais_base=data.get("pais_base"),
         redes_sociales=data.get("redes_sociales"),
+        whatsapp=data.get("whatsapp"),
+        instagram=data.get("instagram"),
+        tiktok=data.get("tiktok"),
         activo=data.get("activo", True),
     )
     db.session.add(guia)
@@ -1026,6 +1032,9 @@ def admin_create_guia():
         "idiomas": guia.idiomas,
         "pais_base": guia.pais_base,
         "redes_sociales": guia.redes_sociales,
+        "whatsapp": guia.whatsapp,
+        "instagram": guia.instagram,
+        "tiktok": guia.tiktok,
         "activo": guia.activo,
     }}), 201
 
@@ -1074,7 +1083,7 @@ def admin_update_guia(guia_id):
         data = request.get_json() or {}
 
     # actualizar campos
-    for field in ["nombre", "bio", "especialidad", "idiomas", "pais_base", "redes_sociales", "activo"]:
+    for field in ["nombre", "bio", "especialidad", "idiomas", "pais_base", "redes_sociales", "whatsapp", "instagram", "tiktok", "activo"]:
         if field in data:
             setattr(guia, field, data[field])
 
@@ -1090,6 +1099,9 @@ def admin_update_guia(guia_id):
         "idiomas": guia.idiomas,
         "pais_base": guia.pais_base,
         "redes_sociales": guia.redes_sociales,
+        "whatsapp": guia.whatsapp,
+        "instagram": guia.instagram,
+        "tiktok": guia.tiktok,
         "activo": guia.activo,
     }})
 
