@@ -1472,40 +1472,49 @@ def admin_eliminar_comentario(comentario_id):
     return jsonify({"message": "Comentario eliminado permanentemente"})
 
 
-@admin_bp.route('/guias/<int:id>/foto', methods=['POST'])
-def upload_foto_guia(id):
-    guia = Guia.query.get_or_404(id)
+@admin_bp.post("/guias/<int:guia_id>/foto")
+@jwt_required()
+def upload_foto_guia(guia_id):
+    """Sube/actualiza la foto de un guía. Campo: file (form-data)."""
+    _, error = _require_admin()
+    if error:
+        return error
 
-    # 1. Verificar si enviaron el archivo
-    if 'foto' not in request.files:
-        return jsonify({"error": "No se envió ninguna imagen"}), 400
-    
-    file = request.files['foto']
-    
-    if file.filename == '':
-        return jsonify({"error": "Nombre de archivo vacío"}), 400
+    guia = Guia.query.get(guia_id)
+    if not guia:
+        return jsonify({"message": "Guía no encontrado"}), 404
 
-    if file:
-        # 2. Limpiar el nombre del archivo (seguridad)
-        filename = secure_filename(file.filename)
-        
-        # 3. Definir dónde guardar (Ej: carpeta 'static/uploads/guias')
-        # Asegúrate de crear esta carpeta en tu proyecto
-        upload_folder = os.path.join(current_app.root_path, 'static', 'uploads', 'guias')
-        os.makedirs(upload_folder, exist_ok=True) # Crea la carpeta si no existe
-        
-        path_completo = os.path.join(upload_folder, filename)
-        file.save(path_completo)
-        
-        # 4. Actualizar la base de datos con la URL relativa
-        # Usamos '/' para que funcione en web
-        guia.foto_url = f"/static/uploads/guias/{filename}"
-        db.session.commit()
+    if "file" not in request.files:
+        return jsonify({"message": "No se envió ninguna imagen"}), 400
 
-        return jsonify({
-            "mensaje": "Foto actualizada correctamente",
-            "url": guia.foto_url
-        }), 200
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"message": "Nombre de archivo vacío"}), 400
+
+    if not allowed_file(file.filename):
+        return jsonify({"message": "Tipo de archivo no permitido"}), 400
+
+    filename = secure_filename(file.filename)
+    folder = "guias"
+    upload_folder = os.path.join(current_app.config["UPLOAD_FOLDER"], folder)
+    os.makedirs(upload_folder, exist_ok=True)
+
+    filepath = os.path.join(upload_folder, filename)
+    file.save(filepath)
+
+    guia.foto_url = f"/uploads/{folder}/{filename}"
+    db.session.commit()
+
+    return jsonify({
+        "message": "Foto actualizada correctamente",
+        "foto_url": guia.foto_url,
+        "guia": {
+            "id": guia.id,
+            "nombre": guia.nombre,
+            "foto_url": guia.foto_url,
+            "activo": guia.activo,
+        }
+    })
 
 # ================== USUARIOS (Para selectores) =====================
 

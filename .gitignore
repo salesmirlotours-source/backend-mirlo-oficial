@@ -21,7 +21,9 @@ env/
 .env.dev
 .env.prod
 
-# Uploads locales (en produccion usar S3 o similar)
+# Uploads locales
+uploads/
+static/uploads/
 
 
 # Logs
