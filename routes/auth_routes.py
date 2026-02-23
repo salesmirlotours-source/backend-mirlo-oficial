@@ -97,3 +97,33 @@ def verify_token():
         
     except Exception as e:
         return jsonify({"valid": False, "message": str(e)}), 401
+
+
+@auth_bp.put("/perfil")
+@jwt_required()
+def update_perfil():
+    """Actualiza el perfil del usuario autenticado."""
+    user_id = get_jwt_identity()
+    user = Usuario.query.get(user_id)
+    if not user:
+        return jsonify({"message": "Usuario no encontrado"}), 404
+
+    data = request.get_json() or {}
+
+    campos_permitidos = ["nombre", "apellido", "telefono", "pais"]
+    for campo in campos_permitidos:
+        if campo in data:
+            setattr(user, campo, data[campo])
+
+    # Cambio de contraseña (opcional)
+    if data.get("password_actual") and data.get("password_nueva"):
+        if not user.check_password(data["password_actual"]):
+            return jsonify({"message": "La contraseña actual es incorrecta"}), 400
+        user.set_password(data["password_nueva"])
+
+    db.session.commit()
+
+    return jsonify({
+        "message": "Perfil actualizado correctamente",
+        "user": user.to_dict()
+    })

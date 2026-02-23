@@ -4,7 +4,6 @@ from datetime import date
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
-from flask import current_app # Para saber donde está la carpeta de tu app
 from extensions import db
 from models import (
     Usuario,
@@ -26,10 +25,13 @@ from models import (
     ComentarioEstado,
     TourBanner, MediaTipo,
     TourUbicacion,
-    Categoria
+    Categoria,
+    ConsultaTour,
+    PortadaHome
 )
 from sqlalchemy import func
 from utils.cloudinary_helper import upload_to_cloudinary
+from config import Config
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
 
@@ -45,11 +47,39 @@ def _require_admin():
 
 # --------------- Helper para uploads -----------------------
 
-ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif", "mp4", "webm", "mov", "avi"}
 
 
 def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def _parse_bool(val, default=True):
+    """Convierte string 'true'/'false' de form-data a bool Python."""
+    if val is None:
+        return default
+    if isinstance(val, bool):
+        return val
+    return str(val).lower() in ("true", "1", "yes", "si")
+
+
+# ================== CLOUDINARY CONFIG (para upload directo del frontend) ======
+
+@admin_bp.get("/cloudinary-config")
+@jwt_required()
+def get_cloudinary_config():
+    """
+    Devuelve los datos para que el frontend suba archivos directo a Cloudinary.
+    Solo admins pueden obtener esta info.
+    """
+    _, error = _require_admin()
+    if error:
+        return error
+
+    return jsonify({
+        "cloud_name": Config.CLOUDINARY_CLOUD_NAME,
+        "upload_preset": "mirlotours_unsigned",
+    })
 
 
 # ================== UPLOAD DE ARCHIVOS GENÉRICO =====================
@@ -130,7 +160,7 @@ def admin_create_categoria():
         imagen_url=data.get("imagen_url"),
         icono=data.get("icono"),
         orden=data.get("orden", 0),
-        activo=data.get("activo", True)
+        activo=_parse_bool(data.get("activo"), True)
     )
 
     db.session.add(categoria)
@@ -173,7 +203,7 @@ def admin_update_categoria(categoria_id):
     if "orden" in data:
         categoria.orden = data["orden"]
     if "activo" in data:
-        categoria.activo = data["activo"]
+        categoria.activo = _parse_bool(data["activo"])
 
     db.session.commit()
 
@@ -317,7 +347,7 @@ def admin_create_tour():
         descripcion_larga=data.get("descripcion_larga"),
         ruta_resumida=data.get("ruta_resumida"),
         guia_principal_id=data.get("guia_principal_id"),
-        activo=data.get("activo", True),
+        activo=_parse_bool(data.get("activo"), True),
         orden_destacado=data.get("orden_destacado")
     )
 
@@ -357,11 +387,11 @@ def admin_update_tour(tour_id):
     for field in [
         "nombre", "slug", "pais", "duracion_dias", "nivel_actividad",
         "precio_pp", "moneda", "banner_url",
-        "foto_portada",
+        "foto_portada", "posicion_portada",
         "descripcion_corta",
         "descripcion_larga", "ruta_resumida", "guia_principal_id",
         "activo", "orden_destacado",
-        "categoria_id"  # Para asignar categoría
+        "categoria_id"
     ]:
         if field in data:
             setattr(tour, field, data[field])
@@ -402,11 +432,16 @@ def admin_upload_portada(tour_id):
     foto_url = upload_to_cloudinary(file, folder=f"tours/{tour.id}")
 
     tour.foto_portada = foto_url
+    # Leer posicion_portada del form-data si viene
+    posicion = request.form.get("posicion_portada")
+    if posicion:
+        tour.posicion_portada = posicion
     db.session.commit()
 
     return jsonify({
         "message": "Foto de portada actualizada",
         "foto_portada": foto_url,
+        "posicion_portada": tour.posicion_portada,
         "tour": tour.to_card_dict()
     }), 200
 
@@ -586,9 +621,15 @@ def admin_delete_fecha(fecha_id):
     if not fecha:
         return jsonify({"message": "Fecha no encontrada"}), 404
 
-    db.session.delete(fecha)
-    db.session.commit()
-    return jsonify({"message": "Fecha eliminada"})
+    try:
+        # Eliminar reservas asociadas a esta fecha antes de borrarla
+        Reserva.query.filter_by(fecha_tour_id=fecha_id).delete()
+        db.session.delete(fecha)
+        db.session.commit()
+        return jsonify({"message": "Fecha eliminada"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"message": f"Error al eliminar fecha: {str(e)}"}), 500
 
 
 # ================== ITINERARIO =====================
@@ -899,6 +940,9 @@ def admin_list_guias():
             "especialidad": g.especialidad,
             "idiomas": g.idiomas,
             "pais_base": g.pais_base,
+            "whatsapp": g.whatsapp,
+            "instagram": g.instagram,
+            "tiktok": g.tiktok,
             "activo": g.activo,
         }
         for g in guias
@@ -956,7 +1000,10 @@ def admin_create_guia():
         idiomas=data.get("idiomas"),
         pais_base=data.get("pais_base"),
         redes_sociales=data.get("redes_sociales"),
-        activo=data.get("activo", True),
+        whatsapp=data.get("whatsapp"),
+        instagram=data.get("instagram"),
+        tiktok=data.get("tiktok"),
+        activo=_parse_bool(data.get("activo"), True),
     )
     db.session.add(guia)
     db.session.commit()
@@ -970,6 +1017,9 @@ def admin_create_guia():
         "idiomas": guia.idiomas,
         "pais_base": guia.pais_base,
         "redes_sociales": guia.redes_sociales,
+        "whatsapp": guia.whatsapp,
+        "instagram": guia.instagram,
+        "tiktok": guia.tiktok,
         "activo": guia.activo,
     }}), 201
 
@@ -1009,9 +1059,11 @@ def admin_update_guia(guia_id):
         data = request.get_json() or {}
 
     # actualizar campos
-    for field in ["nombre", "bio", "especialidad", "idiomas", "pais_base", "redes_sociales", "activo"]:
+    for field in ["nombre", "bio", "especialidad", "idiomas", "pais_base", "redes_sociales", "whatsapp", "instagram", "tiktok"]:
         if field in data:
             setattr(guia, field, data[field])
+    if "activo" in data:
+        guia.activo = _parse_bool(data["activo"])
 
     guia.foto_url = foto_url
 
@@ -1025,6 +1077,9 @@ def admin_update_guia(guia_id):
         "idiomas": guia.idiomas,
         "pais_base": guia.pais_base,
         "redes_sociales": guia.redes_sociales,
+        "whatsapp": guia.whatsapp,
+        "instagram": guia.instagram,
+        "tiktok": guia.tiktok,
         "activo": guia.activo,
     }})
 
@@ -1407,29 +1462,39 @@ def admin_eliminar_comentario(comentario_id):
     return jsonify({"message": "Comentario eliminado permanentemente"})
 
 
-@admin_bp.route('/guias/<int:id>/foto', methods=['POST'])
-def upload_foto_guia(id):
-    guia = Guia.query.get_or_404(id)
+@admin_bp.post("/guias/<int:guia_id>/foto")
+@jwt_required()
+def upload_foto_guia(guia_id):
+    """Sube/actualiza la foto de un guía. Campo: file (form-data)."""
+    _, error = _require_admin()
+    if error:
+        return error
 
-    # 1. Verificar si enviaron el archivo
-    if 'foto' not in request.files:
-        return jsonify({"error": "No se envió ninguna imagen"}), 400
-    
-    file = request.files['foto']
-    
-    if file.filename == '':
-        return jsonify({"error": "Nombre de archivo vacío"}), 400
+    guia = Guia.query.get(guia_id)
+    if not guia:
+        return jsonify({"message": "Guía no encontrado"}), 404
 
-    if file:
-        foto_url = upload_to_cloudinary(file, folder="guias")
+    if "file" not in request.files:
+        return jsonify({"message": "No se envió ninguna imagen"}), 400
 
-        guia.foto_url = foto_url
-        db.session.commit()
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"message": "Nombre de archivo vacío"}), 400
 
-        return jsonify({
-            "mensaje": "Foto actualizada correctamente",
-            "url": guia.foto_url
-        }), 200
+    foto_url = upload_to_cloudinary(file, folder="guias")
+    guia.foto_url = foto_url
+    db.session.commit()
+
+    return jsonify({
+        "message": "Foto actualizada correctamente",
+        "foto_url": guia.foto_url,
+        "guia": {
+            "id": guia.id,
+            "nombre": guia.nombre,
+            "foto_url": guia.foto_url,
+            "activo": guia.activo,
+        }
+    })
 
 # ================== USUARIOS (Para selectores) =====================
 
@@ -1786,18 +1851,14 @@ def admin_update_usuario(usuario_id):
         if campo in data:
             setattr(usuario, campo, data[campo])
 
-    # Cambio de rol (solo super_admin puede cambiar roles)
+    # Cambio de rol (admin y super_admin pueden cambiar roles)
     if "rol" in data:
         nuevo_rol = data["rol"].lower()
         roles_validos = ["cliente", "admin", "super_admin"]
-        
+
         if nuevo_rol not in roles_validos:
             return jsonify({"message": f"Rol inválido. Debe ser: {', '.join(roles_validos)}"}), 400
-        
-        # Solo super_admin puede crear otros admins
-        if nuevo_rol in ["admin", "super_admin"] and admin.rol != "super_admin":
-            return jsonify({"message": "Solo un super_admin puede asignar roles de administrador"}), 403
-        
+
         # No permitir degradarse a sí mismo
         if usuario.id == admin.id and nuevo_rol == "cliente":
             return jsonify({"message": "No puedes degradar tu propio rol"}), 400
@@ -1858,10 +1919,6 @@ def admin_cambiar_rol_usuario(usuario_id):
     if error:
         return error
 
-    # Solo super_admin puede cambiar roles
-    if admin.rol != "super_admin":
-        return jsonify({"message": "Solo un super_admin puede cambiar roles"}), 403
-
     usuario = Usuario.query.get(usuario_id)
     if not usuario:
         return jsonify({"message": "Usuario no encontrado"}), 404
@@ -1919,10 +1976,6 @@ def admin_crear_usuario():
     if rol not in roles_validos:
         return jsonify({"message": f"Rol inválido. Opciones: {', '.join(roles_validos)}"}), 400
 
-    # Solo super_admin puede crear admins
-    if rol in ["admin", "super_admin"] and admin.rol != "super_admin":
-        return jsonify({"message": "Solo un super_admin puede crear administradores"}), 403
-
     usuario = Usuario(
         nombre=data["nombre"],
         apellido=data.get("apellido"),
@@ -1930,7 +1983,7 @@ def admin_crear_usuario():
         telefono=data.get("telefono"),
         pais=data.get("pais"),
         rol=rol,
-        activo=data.get("activo", True),
+        activo=_parse_bool(data.get("activo"), True),
     )
     usuario.set_password(data["password"])
 
@@ -2121,7 +2174,7 @@ def admin_update_banner(banner_id):
     if "orden" in data:
         banner.orden = int(data["orden"])
     if "activo" in data:
-        banner.activo = data["activo"]
+        banner.activo = _parse_bool(data["activo"])
     if "overlay_opacity" in data:
         banner.overlay_opacity = float(data["overlay_opacity"])
     if "posicion_vertical" in data:
@@ -2315,7 +2368,7 @@ def admin_create_ubicacion(tour_id):
         dia_fin=data.get("dia_fin"),
         tipo_ubicacion=data.get("tipo_ubicacion", "destino"),
         imagen_url=data.get("imagen_url"),
-        activo=data.get("activo", True),
+        activo=_parse_bool(data.get("activo"), True),
     )
 
     db.session.add(ubicacion)
@@ -2484,6 +2537,8 @@ def admin_update_galeria(item_id):
         item.orden = data["orden"]
     if "categoria" in data:
         item.categoria = data["categoria"]
+    if "posicion_imagen" in data:
+        item.posicion_imagen = data["posicion_imagen"]
 
     db.session.commit()
 
@@ -2491,4 +2546,240 @@ def admin_update_galeria(item_id):
         "message": "Galeria actualizada",
         "galeria": item.to_dict()
     })
+
+
+# ================== ELIMINACIÓN PERMANENTE =====================
+
+@admin_bp.delete("/reservas/<int:reserva_id>/permanente")
+@jwt_required()
+def admin_delete_reserva_permanente(reserva_id):
+    """
+    Elimina una reserva PERMANENTEMENTE de la base de datos.
+    CUIDADO: Esta acción no se puede deshacer.
+    """
+    _, error = _require_admin()
+    if error:
+        return error
+
+    reserva = Reserva.query.get(reserva_id)
+    if not reserva:
+        return jsonify({"message": "Reserva no encontrada"}), 404
+
+    try:
+        info = {
+            "id": reserva.id,
+            "tour": reserva.tour.nombre if reserva.tour else "N/A",
+            "usuario": reserva.usuario.email if reserva.usuario else "N/A"
+        }
+
+        db.session.delete(reserva)
+        db.session.commit()
+
+        return jsonify({
+            "message": f"Reserva #{info['id']} eliminada permanentemente",
+            "deleted": info
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "message": f"Error al eliminar reserva: {str(e)}"
+        }), 500
+
+
+@admin_bp.delete("/usuarios/<int:usuario_id>/permanente")
+@jwt_required()
+def admin_delete_usuario_permanente(usuario_id):
+    """
+    Elimina un usuario PERMANENTEMENTE de la base de datos.
+    CUIDADO: Esta acción no se puede deshacer.
+    Elimina: reservas, comentarios y consultas del usuario.
+    """
+    admin, error = _require_admin()
+    if error:
+        return error
+
+    usuario = Usuario.query.get(usuario_id)
+    if not usuario:
+        return jsonify({"message": "Usuario no encontrado"}), 404
+
+    # No permitir eliminarse a sí mismo
+    if usuario.id == admin.id:
+        return jsonify({"message": "No puedes eliminar tu propia cuenta"}), 400
+
+    # Solo super_admin puede eliminar otros super_admins
+    if usuario.rol == "super_admin" and admin.rol != "super_admin":
+        return jsonify({"message": "Solo un super_admin puede eliminar otros super_admins"}), 403
+
+    try:
+        nombre_usuario = f"{usuario.nombre} ({usuario.email})"
+
+        # 1. Eliminar reservas del usuario
+        Reserva.query.filter_by(usuario_id=usuario_id).delete()
+
+        # 2. Eliminar comentarios del usuario
+        Comentario.query.filter_by(usuario_id=usuario_id).delete()
+
+        # 3. Eliminar consultas del usuario
+        ConsultaTour.query.filter_by(usuario_id=usuario_id).delete()
+
+        # 4. Eliminar el usuario
+        db.session.delete(usuario)
+        db.session.commit()
+
+        return jsonify({
+            "message": f"Usuario '{nombre_usuario}' eliminado permanentemente",
+            "deleted_id": usuario_id
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "message": f"Error al eliminar usuario: {str(e)}"
+        }), 500
+
+
+# ================== PORTADAS (HOME, SOBRE NOSOTROS, CONTACTANOS) =====================
+
+SECCIONES_VALIDAS = ["home", "sobre_nosotros", "contactanos"]
+
+
+@admin_bp.get("/portadas")
+@jwt_required()
+def admin_list_portadas():
+    """
+    Lista portadas. Filtrar por seccion con ?seccion=home
+    Sin filtro devuelve todas.
+    """
+    _, error = _require_admin()
+    if error:
+        return error
+
+    seccion = request.args.get("seccion")
+    query = PortadaHome.query
+    if seccion:
+        query = query.filter_by(seccion=seccion)
+    portadas = query.order_by(PortadaHome.orden.asc()).all()
+    return jsonify([p.to_dict() for p in portadas])
+
+
+@admin_bp.post("/portadas")
+@jwt_required()
+def admin_create_portada():
+    """
+    Crea una portada para cualquier sección.
+    Soporta multipart/form-data con campo 'file'.
+    Campo obligatorio: seccion (home, sobre_nosotros, contactanos).
+    """
+    _, error = _require_admin()
+    if error:
+        return error
+
+    imagen_url = None
+
+    if "file" in request.files:
+        file = request.files["file"]
+        if file.filename == "":
+            return jsonify({"message": "Nombre de archivo vacío"}), 400
+        if not allowed_file(file.filename):
+            return jsonify({"message": "Tipo de archivo no permitido"}), 400
+
+        data = request.form
+        seccion = data.get("seccion", "home").lower()
+        if seccion not in SECCIONES_VALIDAS:
+            return jsonify({"message": f"Sección inválida. Opciones: {', '.join(SECCIONES_VALIDAS)}"}), 400
+
+        imagen_url = upload_to_cloudinary(file, folder=f"portadas/{seccion}")
+    else:
+        data = request.get_json() or {}
+        imagen_url = data.get("imagen_url")
+        seccion = data.get("seccion", "home").lower()
+        if seccion not in SECCIONES_VALIDAS:
+            return jsonify({"message": f"Sección inválida. Opciones: {', '.join(SECCIONES_VALIDAS)}"}), 400
+
+    if not imagen_url:
+        return jsonify({"message": "Debe proporcionar un archivo o imagen_url"}), 400
+
+    portada = PortadaHome(
+        seccion=seccion,
+        titulo=data.get("titulo"),
+        subtitulo=data.get("subtitulo"),
+        imagen_url=imagen_url,
+        enlace=data.get("enlace"),
+        posicion_imagen=data.get("posicion_imagen", "50% 50%"),
+        orden=int(data.get("orden", 0)),
+        activo=True,
+    )
+
+    db.session.add(portada)
+    db.session.commit()
+
+    return jsonify({
+        "message": "Portada creada",
+        "portada": portada.to_dict()
+    }), 201
+
+
+@admin_bp.put("/portadas/<int:portada_id>")
+@jwt_required()
+def admin_update_portada(portada_id):
+    """
+    Actualiza una portada.
+    Soporta multipart/form-data (con nuevo 'file') o JSON.
+    """
+    _, error = _require_admin()
+    if error:
+        return error
+
+    portada = PortadaHome.query.get(portada_id)
+    if not portada:
+        return jsonify({"message": "Portada no encontrada"}), 404
+
+    if "file" in request.files:
+        file = request.files["file"]
+        if file.filename and allowed_file(file.filename):
+            portada.imagen_url = upload_to_cloudinary(file, folder=f"portadas/{portada.seccion}")
+        data = request.form
+    else:
+        data = request.get_json() or {}
+        if "imagen_url" in data:
+            portada.imagen_url = data["imagen_url"]
+
+    if "titulo" in data:
+        portada.titulo = data["titulo"]
+    if "subtitulo" in data:
+        portada.subtitulo = data["subtitulo"]
+    if "enlace" in data:
+        portada.enlace = data["enlace"]
+    if "posicion_imagen" in data:
+        portada.posicion_imagen = data["posicion_imagen"]
+    if "orden" in data:
+        portada.orden = int(data["orden"])
+    if "activo" in data:
+        portada.activo = _parse_bool(data["activo"])
+
+    db.session.commit()
+
+    return jsonify({
+        "message": "Portada actualizada",
+        "portada": portada.to_dict()
+    })
+
+
+@admin_bp.delete("/portadas/<int:portada_id>")
+@jwt_required()
+def admin_delete_portada(portada_id):
+    """Elimina una portada permanentemente."""
+    _, error = _require_admin()
+    if error:
+        return error
+
+    portada = PortadaHome.query.get(portada_id)
+    if not portada:
+        return jsonify({"message": "Portada no encontrada"}), 404
+
+    db.session.delete(portada)
+    db.session.commit()
+
+    return jsonify({"message": "Portada eliminada"})
 

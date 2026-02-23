@@ -17,10 +17,27 @@ from models import (
     PagoEstado,
     Guia,
     TourUbicacion,
-    Categoria
+    Categoria,
+    PortadaHome
 )
 
 tour_bp = Blueprint("tours", __name__, url_prefix="/tours")
+
+
+# ================== PORTADAS (PÚBLICO) =====================
+
+@tour_bp.get("/portadas")
+def list_portadas():
+    """
+    Lista portadas activas. Filtrar por sección: ?seccion=home
+    Secciones válidas: home, sobre_nosotros, contactanos
+    """
+    seccion = request.args.get("seccion")
+    query = PortadaHome.query.filter_by(activo=True)
+    if seccion:
+        query = query.filter_by(seccion=seccion)
+    portadas = query.order_by(PortadaHome.orden.asc()).all()
+    return jsonify([p.to_dict() for p in portadas])
 
 
 # ================== CATEGORÍAS (PÚBLICO) =====================
@@ -565,7 +582,7 @@ def enviar_correo_admin(reserva, usuario, tour, fecha, telefono_contacto):
                 {"<div class='section'><div class='section-title'>💬 Comentarios del Cliente</div><p style='background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 0;'>" + str(reserva.comentarios_cliente) + "</p></div>" if reserva.comentarios_cliente else ""}
                 
                 <div style="text-align: center; margin-top: 25px;">
-                    <a href="http://localhost:3000/admin/reservas/{reserva.id}" class="btn">
+                    <a href="https://www.mirlotoursec.com/admin/reservas/{reserva.id}" class="btn">
                         👁️ Ver en Panel de Admin
                     </a>
                 </div>
@@ -601,6 +618,9 @@ def public_list_guias():
             "bio": g.bio,
             "idiomas": g.idiomas,
             "pais_base": g.pais_base,
+            "whatsapp": g.whatsapp,
+            "instagram": g.instagram,
+            "tiktok": g.tiktok,
         }
         for g in guias
     ])
