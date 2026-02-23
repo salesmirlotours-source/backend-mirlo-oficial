@@ -2641,7 +2641,7 @@ def admin_delete_usuario_permanente(usuario_id):
 
 # ================== PORTADAS (HOME, SOBRE NOSOTROS, CONTACTANOS) =====================
 
-SECCIONES_VALIDAS = ["home", "sobre_nosotros", "contactanos"]
+SECCIONES_VALIDAS = ["home", "sobre_nosotros", "contactanos", "tours"]
 
 
 @admin_bp.get("/portadas")
