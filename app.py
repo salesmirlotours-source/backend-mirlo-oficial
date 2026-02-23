@@ -1,5 +1,6 @@
 # app.py
 import os
+import cloudinary
 from flask import Flask, jsonify, send_from_directory
 
 from config import Config
@@ -30,6 +31,14 @@ def create_app():
     app.config['MAIL_PASSWORD'] = os.environ.get('GMAIL_SMTP_APP_PASSWORD', 'xjzq ybas kmfd nzvu')
     app.config['MAIL_DEFAULT_SENDER'] = ('Mirlo Tours', os.environ.get('GMAIL_SMTP_USER', 'Salesmirlotours@gmail.com'))
     app.config['ADMIN_EMAIL'] = os.environ.get('ADMIN_EMAIL', 'Salesmirlotours@gmail.com')  # Correo del admin
+
+    # ☁️ Inicializar Cloudinary
+    cloudinary.config(
+        cloud_name=app.config["CLOUDINARY_CLOUD_NAME"],
+        api_key=app.config["CLOUDINARY_API_KEY"],
+        api_secret=app.config["CLOUDINARY_API_SECRET"],
+        secure=True,
+    )
 
     # Inicializar extensiones
     db.init_app(app)

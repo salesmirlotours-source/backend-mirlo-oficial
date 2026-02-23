@@ -28,7 +28,8 @@ from models import (
     TourUbicacion,
     Categoria
 )
-from sqlalchemy import func # <--- AGREGA ESTO AL INICIO DE admin_routes.py
+from sqlalchemy import func
+from utils.cloudinary_helper import upload_to_cloudinary
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
 
@@ -74,25 +75,14 @@ def upload_file():
     if not allowed_file(file.filename):
         return jsonify({"message": "Tipo de archivo no permitido"}), 400
 
-    filename = secure_filename(file.filename)
-
     # opcional subcarpeta: tours, guias, etc.
-    folder = request.form.get("folder", "").strip()
-    upload_folder = current_app.config["UPLOAD_FOLDER"]
-    if folder:
-        upload_folder = os.path.join(upload_folder, folder)
-        os.makedirs(upload_folder, exist_ok=True)
+    folder = request.form.get("folder", "").strip() or "general"
 
-    filepath = os.path.join(upload_folder, filename)
-    file.save(filepath)
-
-    # construir URL pública
-    url_path = f"/uploads/{folder}/{filename}" if folder else f"/uploads/{filename}"
-    url_path = url_path.replace("//", "/")
+    url = upload_to_cloudinary(file, folder=folder)
 
     return jsonify({
         "message": "Archivo subido correctamente",
-        "url": url_path
+        "url": url
     }), 201
 
 
@@ -409,22 +399,8 @@ def admin_upload_portada(tour_id):
     if not allowed_file(file.filename):
         return jsonify({"message": "Tipo de archivo no permitido"}), 400
 
-    filename = secure_filename(file.filename)
-    
-    # Renombrar a "portada.ext" para evitar acumulación de archivos
-    ext = filename.rsplit(".", 1)[1].lower()
-    filename = f"portada.{ext}"
+    foto_url = upload_to_cloudinary(file, folder=f"tours/{tour.id}")
 
-    # Carpeta: uploads/tours/<tour_id>/
-    folder = os.path.join("tours", str(tour.id))
-    upload_folder = os.path.join(current_app.config["UPLOAD_FOLDER"], folder)
-    os.makedirs(upload_folder, exist_ok=True)
-
-    filepath = os.path.join(upload_folder, filename)
-    file.save(filepath)
-
-    # Actualizar el tour con la URL de la portada
-    foto_url = f"/uploads/{folder}/{filename}".replace("//", "/")
     tour.foto_portada = foto_url
     db.session.commit()
 
@@ -742,17 +718,7 @@ def admin_create_galeria(tour_id):
         if not allowed_file(file.filename):
             return jsonify({"message": "Tipo de archivo no permitido"}), 400
 
-        filename = secure_filename(file.filename)
-
-        # carpeta: uploads/tours/<tour_id>/
-        folder = os.path.join("tours", str(tour.id))
-        upload_folder = os.path.join(current_app.config["UPLOAD_FOLDER"], folder)
-        os.makedirs(upload_folder, exist_ok=True)
-
-        filepath = os.path.join(upload_folder, filename)
-        file.save(filepath)
-
-        foto_url = f"/uploads/{folder}/{filename}".replace("//", "/")
+        foto_url = upload_to_cloudinary(file, folder=f"tours/{tour.id}/galeria")
 
         data = request.form
     else:
@@ -972,16 +938,7 @@ def admin_create_guia():
         if not allowed_file(file.filename):
             return jsonify({"message": "Tipo de archivo no permitido"}), 400
 
-        filename = secure_filename(file.filename)
-
-        folder = "guias"
-        upload_folder = os.path.join(current_app.config["UPLOAD_FOLDER"], folder)
-        os.makedirs(upload_folder, exist_ok=True)
-
-        filepath = os.path.join(upload_folder, filename)
-        file.save(filepath)
-
-        foto_url = f"/uploads/{folder}/{filename}".replace("//", "/")
+        foto_url = upload_to_cloudinary(file, folder="guias")
 
         data = request.form
     else:
@@ -1045,16 +1002,7 @@ def admin_update_guia(guia_id):
         if not allowed_file(file.filename):
             return jsonify({"message": "Tipo de archivo no permitido"}), 400
 
-        filename = secure_filename(file.filename)
-
-        folder = "guias"
-        upload_folder = os.path.join(current_app.config["UPLOAD_FOLDER"], folder)
-        os.makedirs(upload_folder, exist_ok=True)
-
-        filepath = os.path.join(upload_folder, filename)
-        file.save(filepath)
-
-        foto_url = f"/uploads/{folder}/{filename}".replace("//", "/")
+        foto_url = upload_to_cloudinary(file, folder="guias")
 
         data = request.form
     else:
@@ -1473,20 +1421,9 @@ def upload_foto_guia(id):
         return jsonify({"error": "Nombre de archivo vacío"}), 400
 
     if file:
-        # 2. Limpiar el nombre del archivo (seguridad)
-        filename = secure_filename(file.filename)
-        
-        # 3. Definir dónde guardar (Ej: carpeta 'static/uploads/guias')
-        # Asegúrate de crear esta carpeta en tu proyecto
-        upload_folder = os.path.join(current_app.root_path, 'static', 'uploads', 'guias')
-        os.makedirs(upload_folder, exist_ok=True) # Crea la carpeta si no existe
-        
-        path_completo = os.path.join(upload_folder, filename)
-        file.save(path_completo)
-        
-        # 4. Actualizar la base de datos con la URL relativa
-        # Usamos '/' para que funcione en web
-        guia.foto_url = f"/static/uploads/guias/{filename}"
+        foto_url = upload_to_cloudinary(file, folder="guias")
+
+        guia.foto_url = foto_url
         db.session.commit()
 
         return jsonify({
@@ -2098,28 +2035,14 @@ def admin_create_banner(tour_id):
 
             # Determinar tipo
             tipo_str = "video" if ext in allowed_videos else "imagen"
-            
-            filename = secure_filename(file.filename)
-            
-            # Carpeta: uploads/tours/<tour_id>/banners/
-            folder = os.path.join("tours", str(tour.id), "banners")
-            upload_folder = os.path.join(current_app.config["UPLOAD_FOLDER"], folder)
-            os.makedirs(upload_folder, exist_ok=True)
 
-            filepath = os.path.join(upload_folder, filename)
-            file.save(filepath)
+            media_url = upload_to_cloudinary(file, folder=f"tours/{tour.id}/banners")
 
-            # Construir URL
-            media_url = f"/uploads/tours/{tour.id}/banners/{filename}"
-            
             # Procesar poster si viene
             if "poster" in request.files:
                 poster_file = request.files["poster"]
                 if poster_file.filename:
-                    poster_filename = secure_filename(poster_file.filename)
-                    poster_path = os.path.join(upload_folder, f"poster_{poster_filename}")
-                    poster_file.save(poster_path)
-                    poster_url = f"/uploads/tours/{tour.id}/banners/poster_{poster_filename}"
+                    poster_url = upload_to_cloudinary(poster_file, folder=f"tours/{tour.id}/banners/posters")
 
             data = request.form
         else:

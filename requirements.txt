@@ -20,5 +20,8 @@ resend==2.0.0
 # Variables de entorno
 python-dotenv==1.0.1
 
+# Almacenamiento de archivos en la nube
+cloudinary==1.40.0
+
 # Servidor de produccion
 gunicorn==22.0.0

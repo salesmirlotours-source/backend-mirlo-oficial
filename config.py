@@ -35,6 +35,11 @@ class Config:
     # CORS
     CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
 
-    # 📸 Configuración de uploads (fotos en el mismo servidor)
+    # 📸 Configuración de uploads (fallback local)
     UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
     MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10 MB
+
+    # ☁️ Cloudinary (almacenamiento persistente en la nube)
+    CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "ddtkqinsg")
+    CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY", "169176496161789")
+    CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET", "SYuU2s68nJmRX0nAUQ5fZSvtJ1E")
